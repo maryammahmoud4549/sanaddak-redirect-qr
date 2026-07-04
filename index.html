@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Code Redirect & Tracking</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f4f4f9;
+    }
+
+    .loader {
+      text-align: center;
+    }
+
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border-left-color: #09f;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="loader">
+    <div class="spinner"></div>
+    <p>Redirecting you to the App Store...</p>
+  </div>
+  <script>
+    window.onload = function () {
+      // If we are currently inside the hidden iframe doing the returnURL redirect, halt execution to prevent infinite loop
+      if (window.name === "zoho_iframe") {
+        return;
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const storeId = urlParams.get("store_id") || "-None-";
+
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      let deviceType = "Desktop";
+      let storeUrl = "https://apps.apple.com/us/app/sanaddak-%D8%B3%D9%86%D8%AF%D9%83/id6753082914";
+
+      if (/android/i.test(userAgent)) {
+        deviceType = "Android";
+        storeUrl =
+          "https://play.google.com/store/apps/details?id=com.sanaddak.customer&hl=en";
+
+      } else if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+        deviceType = "iOS";
+        storeUrl = "https://apps.apple.com/us/app/sanaddak-%D8%B3%D9%86%D8%AF%D9%83/id6753082914";
+      }
+
+      // Build a unique identifier for this scan. Zoho de-duplicates leads on the
+      // Email field, so a single hardcoded address means only the FIRST scan ever
+      // creates a lead and every later scan is silently dropped. Making the email
+      // unique per scan guarantees each scan is recorded.
+      const scanId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      const uniqueEmail = `qr-${scanId}@sanaddak.com`;
+
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = "https://crm.zoho.com/crm/WebToLeadForm";
+      form.target = "zoho_iframe";
+      form.style.display = "none";
+
+      const inputs = {
+        // These two keys MUST match the live Zoho webform ("QR Redirect Test").
+        // The previous keys pointed at a different/deleted form, so every scan
+        // returned a success-looking 302 but created no lead.
+        xnQsjsdp: "5964fecdf540fd7c3b9b974db24749fea1e29d316c07aba46affdffd7a81cb4c",
+        xmIwtLD: "7d773f2a2e3b7c39e9412da8505175521015d6131b4703212d83cd5af8910ac92ec80ffa01f5ca9090e03245e289c801",
+        actionType: "TGVhZHM=",
+        // Redirect the iframe to exactly this same page to perfectly bypass ALL iframe block policies
+        returnURL: window.location.origin + window.location.pathname,
+        // Company + Last Name are the form's mandatory fields
+        Company: "Sanaddak QR",
+        "Last Name": `App User (${storeId})`,
+        // Unique per scan so Zoho's Email-based de-duplication doesn't drop repeat scans
+        Email: uniqueEmail,
+        // NOTE: do NOT send "Lead Source" — it is a restricted dropdown whose only
+        // valid options are predefined store ids. An arbitrary value fails
+        // validation and makes Zoho silently reject the whole lead. Store info
+        // goes in the free-text Description instead.
+        Description: `Device: ${deviceType} | Store: ${storeId} | Scanned: ${new Date().toISOString()}`
+      };
+
+      for (const [key, value] of Object.entries(inputs)) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+      }
+
+      const iframe = document.createElement("iframe");
+      iframe.name = "zoho_iframe";
+      iframe.style.display = "none";
+      document.body.appendChild(iframe);
+      document.body.appendChild(form);
+
+      form.submit();
+
+      console.log("Form submitted to Zoho CRM via iframe.");
+
+      // Wait a short moment to ensure the submission goes through, then redirect the TOP window safely
+      setTimeout(() => {
+        //window.location.href = storeUrl;
+      }, 1000);
+    };
+  </script>
+</body>
+
+</html>
